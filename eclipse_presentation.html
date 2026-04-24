@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Great Celestial Clock — Predicting Eclipses Without a Globe</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#080818;--bg2:#0d0d24;--bg3:#12122e;
+    --gold:#c8973a;--goldhov:#e8b85a;
+    --text:#e8e8e8;--textmuted:#9999bb;
+    --blue:#4bacc6;--red:#cc3300;--violet:#7b4fa6;
+    --cardBg:#0f0f28;--border:#1e1e42;
+  }
+  html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;overflow:hidden}
+  
+  /* ── SLIDESHOW SHELL ── */
+  #app{display:flex;flex-direction:column;height:100vh;width:100vw}
+  #slideWrap{flex:1;position:relative;overflow:hidden}
+  .slide{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;
+    padding:52px 64px 80px;
+    opacity:0;transition:opacity .4s ease;pointer-events:none;
+    overflow-y:auto;
+  }
+  .slide.active{opacity:1;pointer-events:all}
+  
+  /* ── BOTTOM BAR ── */
+  #bar{
+    height:52px;flex-shrink:0;
+    background:rgba(8,8,24,.95);border-top:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 24px;gap:12px;
+  }
+  #bar button{
+    background:var(--bg3);border:1px solid var(--gold);color:var(--gold);
+    padding:6px 20px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;
+    transition:background .2s;
+  }
+  #bar button:hover{background:rgba(200,151,58,.15)}
+  #dots{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;flex:1;max-width:70vw}
+  .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--border);border:1px solid var(--textmuted);
+    cursor:pointer;transition:background .2s,transform .2s;flex-shrink:0;
+  }
+  .dot.active{background:var(--gold);transform:scale(1.3)}
+  #counter{font-size:12px;color:var(--textmuted);white-space:nowrap;min-width:80px;text-align:right}
+
+  /* ── PART BADGE ── */
+  .part-badge{
+    display:inline-block;font-size:10px;letter-spacing:3px;text-transform:uppercase;
+    color:var(--textmuted);margin-bottom:8px;
+  }
+
+  /* ── TITLES ── */
+  .slide-title{
+    font-size:clamp(22px,3.2vw,40px);font-weight:700;color:var(--gold);
+    line-height:1.15;margin-bottom:18px;
+  }
+  .slide-subtitle{font-size:clamp(14px,1.8vw,20px);color:var(--textmuted);margin-bottom:20px;font-style:italic}
+  .section-head{font-size:15px;color:var(--blue);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;font-weight:600}
+
+  /* ── BODY TEXT ── */
+  .body-text{font-size:clamp(13px,1.3vw,16px);line-height:1.72;color:var(--text);margin-bottom:16px}
+  .body-text + .body-text{margin-top:4px}
+
+  /* ── CALLOUT ── */
+  .callout{
+    border-left:4px solid var(--red);background:rgba(204,51,0,.09);
+    padding:14px 18px;border-radius:0 6px 6px 0;
+    font-size:clamp(12px,1.2vw,15px);font-style:italic;color:#ffccbb;
+    margin:16px 0;line-height:1.6;
+  }
+
+  /* ── GOLD CALLOUT ── */
+  .gcallout{
+    border-left:4px solid var(--gold);background:rgba(200,151,58,.08);
+    padding:14px 18px;border-radius:0 6px 6px 0;
+    font-size:clamp(12px,1.2vw,15px);font-style:italic;color:var(--goldhov);
+    margin:16px 0;line-height:1.6;
+  }
+
+  /* ── TABLES ── */
+  .tbl-wrap{overflow-x:auto;margin:16px 0;border-radius:6px;border:1px solid var(--border)}
+  table{width:100%;border-collapse:collapse;font-size:clamp(11px,1.1vw,14px)}
+  thead tr{background:var(--gold)}
+  thead th{padding:10px 14px;color:#080818;font-weight:700;text-align:left}
+  tbody tr:nth-child(odd){background:var(--cardBg)}
+  tbody tr:nth-child(even){background:var(--bg3)}
+  tbody td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--text)}
+  tbody td.num{color:var(--blue);font-weight:600;font-variant-numeric:tabular-nums}
+  tbody td.type-ts{color:#ffcc44;font-weight:700}
+  tbody td.type-tl{color:#4bacc6;font-weight:700}
+  tbody td.type-pl{color:#9b8fcf;font-weight:700}
+  tbody td.type-ps{color:#88cc88;font-weight:700}
+
+  /* ── IMAGE PLACEHOLDER ── */
+  .img-ph{
+    border:2px dashed var(--violet);background:rgba(123,79,166,.08);
+    border-radius:8px;padding:16px;min-height:200px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;margin:12px 0;gap:8px;
+  }
+  .img-ph .ph-name{color:var(--gold);font-size:13px;font-weight:700;word-break:break-all}
+  .img-ph .ph-desc{color:var(--text);font-size:12px;font-style:italic}
+  .img-ph .ph-dim{color:var(--textmuted);font-size:11px}
+
+  /* ── GRID LAYOUTS ── */
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:12px 0}
+  .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:12px 0}
+  .two-col-img{display:grid;grid-template-columns:1.1fr 1fr;gap:20px;align-items:start}
+  .col-r{display:flex;flex-direction:column;gap:10px}
+
+  /* ── STAT BOXES ── */
+  .stat-row{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0}
+  .stat{
+    background:var(--cardBg);border:1px solid var(--gold);border-radius:6px;
+    padding:14px 20px;flex:1;min-width:120px;text-align:center;
+  }
+  .stat .val{font-size:clamp(20px,2.8vw,36px);font-weight:700;color:var(--gold);display:block}
+  .stat .lbl{font-size:11px;color:var(--textmuted);margin-top:4px;display:block;line-height:1.4}
+
+  /* ── TITLE SLIDE SPECIAL ── */
+  #s1{
+    background:radial-gradient(ellipse at 50% 30%, #0e0e30 0%, #080818 70%);
+    align-items:center;justify-content:center;text-align:center;
+  }
+  #s1 .big-glyph{font-size:clamp(50px,8vw,90px);margin-bottom:24px;opacity:.85}
+  #s1 .main-title{font-size:clamp(28px,5vw,62px);font-weight:800;color:var(--gold);line-height:1.1;margin-bottom:16px}
+  #s1 .sub{font-size:clamp(16px,2vw,24px);color:var(--text);margin-bottom:10px;font-style:italic}
+  #s1 .byline{font-size:clamp(12px,1.2vw,15px);color:var(--textmuted);margin-top:12px}
+  #s1 .rule{width:200px;height:1px;background:var(--gold);margin:20px auto;opacity:.4}
+
+  /* ── HIGHLIGHT TEXT ── */
+  .hl-gold{color:var(--gold);font-weight:700}
+  .hl-blue{color:var(--blue);font-weight:600}
+  .hl-red{color:var(--red);font-weight:700}
+
+  /* ── CONCLUSION SLIDE ── */
+  #s50{background:radial-gradient(ellipse at 50% 20%, #1a0505 0%, #080818 60%);text-align:center;justify-content:center;align-items:center}
+  #s50 .big-close{font-size:clamp(24px,4vw,52px);font-weight:800;color:var(--red);line-height:1.2;margin-bottom:20px}
+
+  /* ── SOURCES PANEL ── */
+  #sources{display:none;position:fixed;inset:0;background:rgba(8,8,24,.97);z-index:100;overflow-y:auto;padding:60px}
+  #sources h2{color:var(--gold);font-size:28px;margin-bottom:24px}
+  #sources ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+  #sources li{color:var(--text);font-size:14px;border-left:2px solid var(--gold);padding-left:12px;line-height:1.6}
+  #sources li a{color:var(--blue)}
+  #closeSrc{position:fixed;top:20px;right:30px;background:var(--red);color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;font-weight:700}
+  #srcBtn{background:var(--bg3);border:1px solid var(--violet);color:var(--violet);padding:6px 16px;border-radius:4px;cursor:pointer;font-size:12px}
+
+  @media(max-width:768px){
+    .slide{padding:32px 24px 70px}
+    .two-col,.two-col-img{grid-template-columns:1fr}
+    .three-col{grid-template-columns:1fr}
+    #bar{padding:0 12px;gap:8px}
+    #bar button{padding:5px 12px;font-size:12px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+<div id="slideWrap">
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 1 — TITLE
+══════════════════════════════════════════════════ -->
+<div class="slide active" id="s1">
+  <div class="big-glyph">☀️🌑</div>
+  <div class="main-title">The Great Celestial Clock</div>
+  <div class="rule"></div>
+  <div class="sub">Predicting Eclipses Without a Globe</div>
+  <div class="sub" style="font-size:clamp(13px,1.5vw,18px);color:var(--gold);margin-top:4px">After J. B. Dimbleby, 1894 — <em>All Past Time</em></div>
+  <div class="byline" style="margin-top:24px">EclipseVault Research &nbsp;·&nbsp; Globebusters Presentation Series &nbsp;·&nbsp; 2026</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 2 — THE QUESTION
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s2">
+  <span class="part-badge">Part 1 — Foundation</span>
+  <div class="slide-title">Do You Actually Need a Globe to Predict Eclipses?</div>
+  <div class="body-text">So right here is where I want to start — because this claim gets repeated constantly. <em>"You need a heliocentric model to predict eclipses."</em> A flat earth debunking website even released a counter-statement claiming only heliocentric ephemerides can do this. Which I find kind of odd, right? Because that would seem to require knowing every solar and lunar movement in perpetuity going back to the beginning of time. And I'm sitting here saying I only need 18 or 36 eclipse cycles and a spreadsheet.</div>
+  <div class="body-text">Here's the thing — they heard someone say it. They repeat it. They don't know what it means. They don't know what an ephemeris is. They don't know what a synodic month is. They've never looked at the data. They've never read Dimbleby. They've never even looked at NASA's own Besselian method and thought: <em>wait, this uses a flat plane?</em></div>
+  <div class="body-text">I want to walk you through what this actually means. We're going to go from the simplest observation — a stick in your yard — all the way up to a 651-year master clock that was known and documented in 1894. And at every single step, we're going to ask: does this require a globe? And the answer is going to be no. Every time.</div>
+  <div class="callout">"They heard someone say it. They just repeat it. They don't know what it means. Let's go through what it actually means."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 3 — THE ANSWER
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s3">
+  <span class="part-badge">Part 1 — Foundation</span>
+  <div class="slide-title">No. Here Is the Proof.</div>
+  <div class="body-text">Short answer: no. Long answer: also no, but with receipts.</div>
+  <div class="body-text">We're in the realm of <span class="hl-gold">kinematics</span>, <span class="hl-gold">observation</span>, and <span class="hl-gold">periodicities</span> only. That's the domain. Not dynamics. Not gravitational mechanics. Not Newton. Not General Relativity. Kinematics — the description of motion. Observation — what you see in the sky. Periodicities — the cycles that repeat. That's it.</div>
+  <div class="body-text">People on Twitter think I need heliocentric ephemerides and Newton and all of this complicated machinery. A mathematics professor at Portland State told me directly — you don't need any of that. Grade school math. You understand fractions, you understand a bit of long-division, you understand the concept of a period and a phase — you're there. Full stop.</div>
+  <div class="body-text">This is what we're going to prove, step by step, over the next fifty slides. By the end, you're going to be able to look at any eclipse prediction system in the world and see exactly where it does and doesn't need a globe. Spoiler: it never does.</div>
+  <div class="callout">"Kinematics. Observation. Periodicities. That's it. All you need is a stick and a watch."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 4 — WHAT YOU ACTUALLY NEED
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s4">
+  <span class="part-badge">Part 1 — Foundation</span>
+  <div class="slide-title">What You Need to Predict Eclipses</div>
+  <div class="body-text">Let me just run through this. A <span class="hl-gold">vertical stick</span> — a gnomon. Stick it in the ground. Watch where the shadow goes. That's your solar position tracker right there. A <span class="hl-gold">timepiece</span> — or, if you don't have one, the Big Dipper. The Big Dipper forms a giant clock in the northern sky. It rotates around Polaris once every 24 hours. When you know that, you've got a clock that never needs winding and never needs a battery. An <span class="hl-gold">angle measurer</span> — two pieces of wood joined with a nail. A protractor from a geometry class. Something that tells you the angle of the Moon above the horizon. And a <span class="hl-gold">fixed observation spot</span> — because you need consistent year-over-year measurements from the same location.</div>
+  <div class="body-text">The alternative? About 12,000 high-specificity eclipse observations from other people, in a spreadsheet. I personally have neither a stick nor infinite patience — but I have both of those things, right? That's all you need.</div>
+  <div class="body-text">I want to say — a professor of mathematics at Portland State confirmed this to me in conversation. Shout out to Heliocentric Steve. Even he agreed that the fundamental prediction doesn't require the heliocentric model. The model comes after the observation. The observation is primary.</div>
+  <div class="callout">"A stick in your backyard and a watch. That's it. A professor of mathematics at Portland State told me that. Shout out to Heliocentric Steve."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 5 — THE SKY AS A CLOCK
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s5">
+  <span class="part-badge">Part 1 — Foundation</span>
+  <div class="slide-title">The Sky Is a Clock — Learn to Read It</div>
+  <div class="body-text">Before anything else, I want you to think about what a clock is. A clock is a predictably repeating phenomenon that you use to mark intervals of time. The sky has three of them and they run at different scales.</div>
+  <div class="three-col">
+    <div class="stat" style="border-color:var(--gold)">
+      <span class="val">☀️</span>
+      <span class="lbl" style="color:var(--gold);font-size:13px;font-weight:700">The Sun</span>
+      <span class="lbl">Time of Day — rises, arcs, sets. Your gnomon tracks it hour by hour.</span>
+    </div>
+    <div class="stat" style="border-color:var(--blue)">
+      <span class="val">🌙</span>
+      <span class="lbl" style="color:var(--blue);font-size:13px;font-weight:700">The Moon</span>
+      <span class="lbl">Day of the Month — phase tells you exactly where you are in the 29.5-day cycle.</span>
+    </div>
+    <div class="stat" style="border-color:var(--violet)">
+      <span class="val">⭐</span>
+      <span class="lbl" style="color:var(--violet);font-size:13px;font-weight:700">The Stars</span>
+      <span class="lbl">Time of Year — the Sun's position among the stars marks the season.</span>
+    </div>
+  </div>
+  <div class="body-text">Our Gregorian calendar ignores all of this. A month can start on any phase of the Moon — which is astronomically absurd. A month can be 28, 29, 30, or 31 days for no astronomical reason. The calendar we use is a pagan solar calendar dressed up with saints' names. It's been engineered to disconnect us from the actual sky clock.</div>
+  <div class="body-text">Every ancient culture knew how to read the sky. Jews, Chinese, Babylonians, indigenous peoples all over the world — they used the Moon. They knew which phase the Moon was in on any given date. They knew when the new year started because the sky told them. This has been engineered out of our awareness.</div>
+  <div class="callout">"Every ancient culture knew this. It's been engineered out of our awareness."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 6 — BEFORE THE MACRO, THE MICRO
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s6">
+  <span class="part-badge">Part 1 — Foundation</span>
+  <div class="slide-title">Before We Can Understand the Big Cycle, We Need the Small One</div>
+  <div class="body-text">Let me frame what we're doing here before we get into the numbers. This knowledge has been forgotten and occulted, then weaponized against us. That's a strong claim, and I mean it. The Saros cycle was in common use in Babylon 2,700 years ago. The Greeks had it. Medieval Arab astronomers had it. And then it became the property of professional astronomers, wrapped in terminology that makes it seem like you need special training to understand it.</div>
+  <div class="body-text">What we're doing in this presentation is unwrapping that. The structure goes like this. You start with the <span class="hl-blue">micro</span> — the three lunar months. Very simple observations. From those, you build the <span class="hl-gold">Saros</span> — the 18-year repeating unit. From the Saros, you build Dimbleby's <span class="hl-gold">team of 70 eclipses</span> — the fixed sequence that never changes. From the team of 70, you build the <span class="hl-red">651-year Great Astronomical Year</span> — the macro. The master clock.</div>
+  <div class="body-text">Every level is built from the one below it. And the one below it is just an observation. A stick. A shadow. A phase. That's the whole foundation. So let's start at the bottom and build up.</div>
+  <div class="gcallout">"This knowledge has been forgotten and occulted, then weaponized against us. But it was always there in the sky."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 7 — THREE FOUNDATIONAL MONTHS
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s7">
+  <span class="part-badge">Part 1 — Foundation</span>
+  <div class="slide-title">Three Numbers. That's the Whole Foundation.</div>
+  <div class="body-text">So here they are. The three lunar months. These are the only numbers you need to build the entire eclipse prediction system. NASA gives them complicated names, but each one is just a directly observable period — something you can measure with a stick and a notebook over a few years of looking up.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Period</th><th>What It Measures</th><th>Duration</th></tr></thead>
+      <tbody>
+        <tr><td><span class="hl-gold">Synodic Month</span></td><td>New Moon to New Moon</td><td class="num">29.530589 days &nbsp;—&nbsp; 29d 12h 44m 03s</td></tr>
+        <tr><td><span class="hl-blue">Anomalistic Month</span></td><td>Perigee to Perigee</td><td class="num">27.554550 days &nbsp;—&nbsp; 27d 13h 18m 33s</td></tr>
+        <tr><td><span class="hl-red" style="color:var(--violet)">Draconic Month</span></td><td>Node to Node</td><td class="num">27.212221 days &nbsp;—&nbsp; 27d 05h 05m 36s</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="two-col-img">
+    <div>
+      <div class="body-text">New moon to new moon. That's the synodic month — the most visually obvious one, the one every ancient culture counted first. Closest point in the Moon's orbit to closest point again — that's the anomalistic. The Moon's orbit is elliptical, so it has a closest point (perigee) and a furthest point (apogee), and the anomalistic month tracks that. And node to node — the draconic month — tracks when the Moon crosses the ecliptic. That's the gate that eclipses have to pass through.</div>
+      <div class="callout">"New moon to new moon. Closest point to closest point. Node to node. Three observations. That's your foundation."</div>
+    </div>
+    <div class="img-ph" style="min-height:180px">
+      <div class="ph-name">Pasted image 20240311064956.png</div>
+      <div class="ph-desc">Moon analemma / lunation animation showing the three cycles</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 8 — THE NODES
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s8">
+  <span class="part-badge">Part 1 — Foundation</span>
+  <div class="slide-title">No Node, No Eclipse. It Is That Simple.</div>
+  <div class="two-col-img">
+    <div>
+      <div class="body-text">Here's the mechanism. The Moon's orbital plane is tilted about 5.1° relative to the ecliptic — the Sun's apparent annual path across the sky. Most of the time, when there's a new moon, the Moon passes slightly above or slightly below the Sun's position. Close, but no cigar. No eclipse.</div>
+      <div class="body-text">An eclipse can only happen when the Moon crosses the ecliptic — at one of its two nodes. The <span class="hl-gold">ascending node</span> is where it crosses going northward. The <span class="hl-gold">descending node</span> is where it crosses going southward. These are also known as <span class="hl-gold">Rahu</span> and <span class="hl-ketu" style="color:var(--violet)">Ketu</span> in the ancient Vedic tradition. The dragon swallowing the Sun or Moon.</div>
+      <div class="body-text">Same node as the Sun — solar eclipse. Opposite node from the Sun — lunar eclipse. The draconic month tells you how long between each node crossing. And it's that simple. The node is the gate. The Moon has to pass through the gate at the right time. If it's a new moon and the Moon is at the gate — solar eclipse. Full moon at the gate — lunar eclipse.</div>
+      <div class="callout">"The node is the gate. The Moon has to pass through the gate at the right time. That's all an eclipse is."</div>
+    </div>
+    <div class="img-ph">
+      <div class="ph-name">Pasted image 20240311065400.png</div>
+      <div class="ph-desc">Node and eclipse geometry diagram showing ascending/descending nodes and shadow geometry</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 9 — THE SAROS CONVERGENCE
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s9">
+  <span class="part-badge">Part 2 — The Saros Cycle</span>
+  <div class="slide-title">The Saros: When All Three Months Line Up at Once</div>
+  <div class="body-text">So here's what it is. This is getting complicated quickly, but let's take a moment and think about it. You have three independently running cycles. They're all slightly different lengths. But after a certain number of repetitions, they all come back to a near-whole-number completion at the same time. That's the Saros. And this is the part I find insane, right? Look at these numbers:</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Measurement</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>223 Synodic Months</td><td class="num">6,585.3223 days</td></tr>
+        <tr><td>239 Anomalistic Months</td><td class="num">6,585.5375 days</td></tr>
+        <tr><td>242 Draconic Months</td><td class="num">6,585.3575 days</td></tr>
+        <tr><td><strong>Duration</strong></td><td class="num"><strong>18 years, 10–11 days, 8 hours</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="two-col-img">
+    <div>
+      <div class="body-text">All three land within 0.22 days of each other after 6,585 days. That's less than 6 hours of spread across 18 years of running. After one Saros: same Moon phase — it's a new or full moon again. Same node proximity — the Moon is back at the gate. Same Moon distance — back near the same perigee position. The eclipse repeats. Same type, same character, same geometry. The Saros is just another name for the lunar cycle. The Babylonians knew this. They called it the 18-year cycle. NASA didn't invent it. They just renamed it.</div>
+      <div class="callout">"The Saros is just another name for the lunar cycle. The Babylonians knew this. NASA didn't invent it."</div>
+    </div>
+    <div class="img-ph">
+      <div class="ph-name">Pasted image 20240311065421.png</div>
+      <div class="ph-desc">Saros convergence / cycle nesting diagram showing three month alignment</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 10 — THE 8-HOUR OFFSET
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s10">
+  <span class="part-badge">Part 2 — The Saros Cycle</span>
+  <div class="slide-title">The 8-Hour Offset Is the Engine of the Whole System</div>
+  <div class="body-text">Now here's the thing that's easy to miss. The Saros cycle is 18 years <span class="hl-red">plus 8 hours</span>. Not exactly 18 years. There's an 8-hour remainder. And that matters enormously — because it means the eclipse doesn't fall in exactly the same geographic location the next time around.</div>
+  <div class="body-text">Think about it this way. In those extra 8 hours, the Earth has rotated approximately <span class="hl-gold">120° of longitude</span> underneath the shadow. So the next eclipse in the series falls roughly 120° west of where the previous one was. Then another 18 years — another 120° west. And then another — another 120° west. Three shifts of 120° = 360°. One full circuit around the realm.</div>
+  <div class="stat-row">
+    <div class="stat"><span class="val">8 hrs</span><span class="lbl">Extra time per Saros beyond the round 18 years</span></div>
+    <div class="stat"><span class="val">~120°</span><span class="lbl">Longitude shift of shadow path per Saros</span></div>
+    <div class="stat"><span class="val">3×</span><span class="lbl">Saroses needed to complete 360° (the Exeligmos)</span></div>
+  </div>
+  <div class="body-text">And here's what I want you to understand about that: if not for the 8-hour offset, the eclipse would just repeat in the same spot forever. That's it. Same spot. Same eclipse. Every 18 years. It would never move. The offset is what sets the whole system in motion. It's what generates the greater clock. It's not a bug — it's the feature.</div>
+  <div class="callout">"If not for the 8-hour offset, the eclipse would just repeat in the same spot forever. That offset is the mechanism that generates the greater cycle."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 11 — SAROS EQUIVALENCES
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s11">
+  <span class="part-badge">Part 2 — The Saros Cycle</span>
+  <div class="slide-title">Every Way to Say 6,585 Days</div>
+  <div class="body-text">Real quick — let me give you all the equivalences. These are all just different units of the same convergence. Nothing mysterious. When you see these in papers and they look intimidating, just remember — they're all the same 6,585 days wearing different hats.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Unit</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Solar days</td><td class="num">6,585.321347</td></tr>
+        <tr><td>Years</td><td class="num">18.029</td></tr>
+        <tr><td>Synodic months</td><td class="num">223</td></tr>
+        <tr><td>Draconic months</td><td class="num">241.999</td></tr>
+        <tr><td>Anomalistic months</td><td class="num">238.992</td></tr>
+        <tr><td>Eclipse years</td><td class="num">18.999 (= 38 eclipse seasons)</td></tr>
+        <tr><td>Sidereal months</td><td class="num">241.029</td></tr>
+        <tr><td>Inex period</td><td class="num">358 synodic months = 10,571.95 days</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="body-text">The Inex at the bottom there — 358 synodic months — is used alongside the Saros in NASA's grid system. One Inex step forward in the grid = one step right. One Saros step = one step down. That grid covers every eclipse in history. And it's built entirely from these numbers. Observational numbers. No globe required to derive any of them.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 12 — THE EXELIGMOS
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s12">
+  <span class="part-badge">Part 2 — The Saros Cycle</span>
+  <div class="slide-title">The Exeligmos — Sounds Like a Harry Potter Spell. It's Three Saroses.</div>
+  <div class="stat-row">
+    <div class="stat"><span class="val">54</span><span class="lbl">Years</span></div>
+    <div class="stat"><span class="val">33</span><span class="lbl">Extra Days</span></div>
+    <div class="stat"><span class="val">3×</span><span class="lbl">Saros Cycles Combined</span></div>
+    <div class="stat"><span class="val">~0°</span><span class="lbl">Net Longitude Shift (reset)</span></div>
+  </div>
+  <div class="body-text">The Exeligmos. I always say it sounds like a Harry Potter spell — Exeligmos! — and something falls off a shelf somewhere. But it's a very practical thing. It's just three Saros cycles stacked together: 54 years and 33 days.</div>
+  <div class="body-text">Here's why it matters. Each Saros has that 8-hour offset that pushes the shadow ~120° westward. Three Saroses = three × 8 hours = 24 hours = one full Earth rotation. So after three Saros cycles, the accumulated offset is essentially zero — the eclipse comes back to nearly the same longitude. Same eclipse, same address, three Saroses later.</div>
+  <div class="body-text">This is the correction mechanism. When you're doing long-range prediction and you want to know <em>where</em> the eclipse will be — not just when — the Exeligmos is your tool. Three Saroses forward, same spot. Simple.</div>
+  <div class="callout">"54 years, 33 days. Three of those 8-hour offsets cancel each other out. Same eclipse, same address, three Saroses later."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 13 — NAMED SUB-CYCLES
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s13">
+  <span class="part-badge">Part 2 — The Saros Cycle</span>
+  <div class="slide-title">NASA's Named Cycles — and Why They Name Them That Way</div>
+  <div class="body-text">So NASA and professional astronomy have named all of these sub-harmonics. And I want to be clear — these are real cycles. I'm not saying they made them up. They're all real, they're all valid, they all correspond to observable astronomical phenomena. But the way they're presented — with the Greek names, the complex papers, the prerequisite of an advanced degree before anyone explains what they actually are — in my opinion, that obscures the true simple nature of what's going on here.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Cycle</th><th>Duration</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><span class="hl-gold">Saros</span></td><td class="num">18 yrs 11 days 8 hrs</td><td>The base unit — the lunar cycle</td></tr>
+        <tr><td><span class="hl-blue">Inex</span></td><td class="num">~29 yrs minus 20 days</td><td>358 synodic months</td></tr>
+        <tr><td>Metonic</td><td class="num">19.0 years</td><td>Sun/moon calendar synchronisation</td></tr>
+        <tr><td>Exeligmos</td><td class="num">54.1 years</td><td>Triple Saros — longitude reset</td></tr>
+        <tr><td>Hipparchus</td><td class="num">345.0 years</td><td>Long-period harmonic</td></tr>
+        <tr><td>Babylonian Period</td><td class="num">441.3 years</td><td>Ancient-validated long period</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="body-text">All of these are sub-harmonics of the same thing — the three lunar months beating against each other. That's it. The structure is simple. The terminology is designed to make it look like it isn't.</div>
+  <div class="callout">"These are real cycles. They just present them in a way that makes this look like you need a PhD and a NASA contract to understand it. You don't."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 14 — THE OSCILLATION
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s14">
+  <span class="part-badge">Part 2 — The Saros Cycle</span>
+  <div class="slide-title">The Cycle Offsets — and That Offset Creates the Greater Cycle</div>
+  <div class="two-col-img">
+    <div>
+      <div class="body-text">Here's the mechanism by which a simple 18-year heartbeat generates a 651-year master clock. The Saros is not a perfectly round number. After each 18-year period, the geometry doesn't return to exactly where it started — it overshoots by a tiny fraction. That fraction accumulates. Each successive 18-year cycle begins slightly ahead of where the last one ended.</div>
+      <div class="body-text">When you graph this over hundreds of years, you see an oscillation — a wave pattern. The eclipse activity peaks, then troughs, then peaks again. The wave has a period of approximately 651 years — the Great Astronomical Year. So the simple non-integer nature of the Saros is what generates the macro structure. The imperfection is the mechanism.</div>
+      <div class="body-text">Think of it like harmony in music — when do the tones line up? Two tones of slightly different frequencies beat against each other, creating a lower-frequency oscillation. That beat frequency is the Saros offset playing out over centuries. It's literally the same mathematics as musical beats.</div>
+      <div class="callout">"Because it's not a perfect whole number, the cycle shifts each time. That shift is not a bug. It's the feature that creates the greater clock."</div>
+    </div>
+    <div class="img-ph">
+      <div class="ph-name">Pasted image 20240312075431.png</div>
+      <div class="ph-desc">Saros-Inex panorama showing the oscillation pattern across eclipse families</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 15 — SAROS 136 EXAMPLE
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s15">
+  <span class="part-badge">Part 2 — The Saros Cycle</span>
+  <div class="slide-title">Here Is What This Looks Like in Real Data: Saros 136</div>
+  <div class="body-text">I want to make this concrete. Let's look at Saros series 136 — one of the most famous active series right now. It currently produces the longest total solar eclipses visible from Earth in the 20th and 21st centuries. Big deal series.</div>
+  <div class="body-text">Plot nine eclipses from this series — 1937 through 2081. Every single one shifts approximately <span class="hl-gold">120° westward</span> in longitude from the previous one. Every single one. Eighteen years apart, 120° west, same eclipse character. And there's a secondary drift northward as the Moon's position relative to its descending node shifts slowly over the longer cycle — but the primary pattern is the 120° westward march.</div>
+  <div class="body-text">You can watch the eclipse move around the realm, step by step, in the real observational data. Eclipse here. 18 years — here. 18 years — here. All the way around. This is the Saros in action. This is not theory. This is data. You can check it yourself on any eclipse catalogue.</div>
+  <div class="img-ph">
+    <div class="ph-name">Pasted image 20240303123811.png</div>
+    <div class="ph-desc">Saros 136 path shift diagram — showing ~120° westward longitude shift per 18-year cycle across nine eclipses 1937–2081</div>
+    <div class="ph-dim">Wide format — panoramic view of successive eclipse tracks</div>
+  </div>
+  <div class="callout">"Saros 136. 120 degrees west every 18 years. Same character eclipse, same type, shifting around our realm. You can see it in the data."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 16 — WHO WAS DIMBLEBY
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s16">
+  <span class="part-badge">Part 3 — Dimbleby</span>
+  <div class="slide-title">J. B. Dimbleby — He Deserves the Full Name</div>
+  <div class="body-text">Dimbleby. J. B. Dimbleby. And he deserves the full name — he deserves the recognition. This is a Victorian researcher who sat down in 1894, looked at eclipse data going back thousands of years, and found a structure that NASA now maps on their own website without explaining where the structure comes from. He figured it out in 1894. He went in, did the work, and it holds up.</div>
+  <div class="body-text">The book is called <em>All Past Time</em>. Published 1894. 125 pages. It is on PDF — I'll put the link in the description. Everyone should read it. It's only 125 pages and it will change how you see eclipse data forever.</div>
+  <div class="body-text">I want to give credit here to <span class="hl-gold">Patricia</span> — she's in the Globebusters Discord and she was the person who showed me this book. She gave me the presentation about two years before I put this one together. She introduced me to Dimbleby and said: go read this. I did. I went and verified it myself. Everything Dimbleby claims — I checked it against the modern eclipse catalogues. It holds up. Every time. Patricia, thank you. She's the one who started all of this for me.</div>
+  <div class="callout">"All Past Time, 1894. Link will be in the description. Everyone should read it. It's only 125 pages. I have it on PDF."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 17 — DIMBLEBY'S METHOD
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s17">
+  <span class="part-badge">Part 3 — Dimbleby</span>
+  <div class="slide-title">How Dimbleby Did It — Pattern Recognition on the Data</div>
+  <div class="body-text">Dimbleby wasn't working from theory. This is the key thing to understand. He wasn't starting with a model and fitting the data to it. He was looking at the observed data — chronological eclipse records going back thousands of years — and noticing what was there.</div>
+  <div class="body-text">And here's what he noticed. When you arrange eclipses <em>chronologically</em> — as an observer watching the sky would experience them, one eclipse after another in time — they always appear in the same sequential order of types. Total solar, then another type, then another. The same pattern, over and over, as far back as the records go. Not the same eclipse series — he wasn't grouping by Saros. He was watching the sky as a continuous stream and noticing that the stream had a fixed pattern.</div>
+  <div class="body-text">That is the discovery. Not a theoretical derivation. Pattern recognition from the data. He looked at what was there and saw it. The same way that a musician hears the beat frequency between two slightly mistuned instruments — he heard the pattern in the eclipse data that no one before him had explicitly articulated in this way.</div>
+  <div class="callout">"He wasn't doing it from theory. He was looking at the observed data chronologically and noticed the pattern repeat. That's it. That's the discovery."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 18 — THE ECLIPSE CHRONOMETER
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s18">
+  <span class="part-badge">Part 3 — Dimbleby</span>
+  <div class="slide-title">The Eclipse Chronometer — A Clock That Dates the Ancient World</div>
+  <div class="two-col-img">
+    <div>
+      <div class="body-text">Once Dimbleby had the fixed sequence — once he knew the team of 70 eclipses always appears in the same order — he could turn it into a dating tool. And this is insane when you think about it. He built an eclipse chronometer.</div>
+      <div class="body-text">Here's how it works. Suppose you find a historical record. An ancient Babylonian astronomical diary that says: "There was a great eclipse and the Moon covered the Sun entirely." That's a total solar eclipse. You know the character. You know its position options within the 70-eclipse sequence. Cross-reference with the Hebrew calendar date of the historical record. Find which team it falls in. Count forward and backward. You can pinpoint the year precisely.</div>
+      <div class="body-text">Dimbleby did this for every major biblical and ancient historical astronomical event mentioned in ancient records. He mapped out the chronological dates all the way through — using the character and type of the eclipse, the Hebrew calendar, and the team sequence. That is his chronometer. And it works.</div>
+      <div class="callout">"He mapped out the chronological dates all the way through. He used the character and type of the eclipse, the Hebrew calendar, and the team sequence. That is his chronometer."</div>
+    </div>
+    <div class="img-ph">
+      <div class="ph-name">Pasted image 20240314095823.png</div>
+      <div class="ph-desc">Dimbleby's eclipse chronometer mapping — chronological team positions against the Hebrew calendar</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 19 — VALIDATED AGAINST SCRIPTURE
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s19">
+  <span class="part-badge">Part 3 — Dimbleby</span>
+  <div class="slide-title">When You Do It, It Aligns with the Biblical Record</div>
+  <div class="body-text">And here's the validation. When Dimbleby applied his chronometer — when he took the team sequence and mapped it against the Hebrew calendar and the biblical record — it aligned. Not approximately. It aligned. The Ancient Hebrew Solar Cycle commenced with year 1722. Every 285th year mirrors the first in terms of Sabbath day correspondence. The antediluvian Lunar Cycle spans 133 years with systematic numerical precision.</div>
+  <div class="body-text">The Babylonian and Assyrian historical records align with the Lunar Cycle and with the biblical timeline. These are independent traditions — Babylon, Assyria, Israel — all using the same sky clock, all recording the same events, all arriving at the same astronomical framework. You cross-validate with eclipse records from Babylon. You cross-validate with the Assyrian king list. You cross-validate with the Hebrew calendar structure. They all line up.</div>
+  <div class="body-text">This is what makes the chronometer reliable. It's not just theory. It's been validated against three independent historical traditions that independently preserved the same astronomical knowledge. When three independent lines of evidence agree, that's not coincidence.</div>
+  <div class="callout">"Babylon. Assyria. Israel. They all used the same sky clock. And it aligns. Every time."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 20 — INTRODUCING THE TEAM OF 70
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s20">
+  <span class="part-badge">Part 4 — The Team of 70 [Centrepiece]</span>
+  <div class="slide-title">70 Eclipses Form the Natural Team</div>
+  <div class="two-col-img">
+    <div>
+      <div class="body-text">This is the part I couldn't get over, right? This is the thing that Patricia pointed me to and said: go look at this. And when I went and looked at it — I genuinely could not believe this wasn't more widely known.</div>
+      <div class="body-text">Each Saros series — when you count eclipses <em>chronologically</em> as an observer experiences them, not as NASA groups them by 18-year spacing — contains exactly <span class="hl-gold">70 eclipses</span>. Not 69. Not 71. 70. Always. And these 70 always appear in the same fixed order. Always. Without exception. Every time the team runs, it runs in the same sequence of eclipse types.</div>
+      <div class="body-text">Dimbleby called this the <span class="hl-gold">natural team</span>. Not an arbitrary grouping — a natural one. The data produces this structure on its own. You're not imposing a framework. You're observing a pattern that's in the sky. 70 eclipses. Fixed sequence. Identical every time. <em>Every single time.</em></div>
+      <div class="callout">"70 eclipses. Natural team. Always in the same order. Every single time. That's the discovery. It blew me away. I'd never heard it before."</div>
+    </div>
+    <div class="img-ph">
+      <div class="ph-name">Pasted image 20240314095842.png</div>
+      <div class="ph-desc">Dimbleby's team of 70 overview — showing the natural team structure from All Past Time (1894)</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 21 — HOW TO COUNT (CHRONOLOGICAL vs SAROS)
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s21">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">Here's the Key to Understanding the Team — How You Count Matters</div>
+  <div class="body-text">Let me walk you through the critical distinction that most people miss. This is the thing that trips everyone up when they first encounter this. It's about how you count.</div>
+  <div class="two-col">
+    <div style="background:var(--cardBg);border:1px solid var(--border);border-radius:8px;padding:18px">
+      <div style="color:var(--blue);font-weight:700;margin-bottom:10px;font-size:14px">NASA's METHOD — By Saros Series</div>
+      <div class="body-text" style="font-size:13px">Group eclipses by their Saros number. Saros 136 = every eclipse that repeats every 18 years from the <em>same starting eclipse</em>. One column in the Saros-Inex panorama. Goes back ~1,300 years. This is how professionals catalog series.</div>
+    </div>
+    <div style="background:var(--cardBg);border:1px solid var(--gold);border-radius:8px;padding:18px">
+      <div style="color:var(--gold);font-weight:700;margin-bottom:10px;font-size:14px">DIMBLEBY's METHOD — Chronological Sequence</div>
+      <div class="body-text" style="font-size:13px">Watch the sky as an observer. Count eclipses as they happen in real time — one after another. 70 eclipses from <em>different</em> Saros series appear in a fixed order over ~1,260–1,300 years. Each eclipse ~18 years from the previous one in the sequence.</div>
+    </div>
+  </div>
+  <div class="body-text">When you switch from NASA's grouping to Dimbleby's chronological view, the pattern emerges. 70 eclipses, all from different Saros series, observed one after another by a person watching the sky across their lifetime and their children's lifetimes — always in the same order. The team spans about 1,300 years and counts one eclipse every 18 years from multiple different Saros series happening in sequence. Like different instruments playing the same melody in rotation.</div>
+  <div class="callout">"Chronologically, as an observer, 70 eclipses occur in that order. That's how Dimbleby looked at it. Not by Saros grouping. By chronological sequence."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 22 — THE FIXED ECLIPSE SEQUENCE
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s22">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">The Order Never Changes — Here It Is</div>
+  <div class="body-text">So here's the sequence. I'm going to walk you through the first 14 positions because they establish the repeating unit. Here's a total solar. This is a partial solar. This is a total lunar. This is a partial lunar. So for a team of 70 they occur in this order and then this order repeats each and every time.</div>
+  <div class="two-col-img" style="grid-template-columns:1.3fr 1fr">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Eclipse Type</th><th>Code</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td class="type-ts">Total Solar</td><td class="type-ts">TS</td></tr>
+          <tr><td class="num">2</td><td class="type-ts">Total Solar</td><td class="type-ts">TS</td></tr>
+          <tr><td class="num">3</td><td class="type-pl">Partial Lunar</td><td class="type-pl">PL</td></tr>
+          <tr><td class="num">4</td><td class="type-ts">Total Solar</td><td class="type-ts">TS</td></tr>
+          <tr><td class="num">5</td><td class="type-tl">Total Lunar</td><td class="type-tl">TL</td></tr>
+          <tr><td class="num">6</td><td class="type-ps">Partial Solar</td><td class="type-ps">PS</td></tr>
+          <tr><td class="num">7</td><td class="type-ps">Partial Solar</td><td class="type-ps">PS</td></tr>
+          <tr><td class="num">8</td><td class="type-ts">Total Solar</td><td class="type-ts">TS</td></tr>
+          <tr><td class="num">9</td><td class="type-tl">Total Lunar</td><td class="type-tl">TL</td></tr>
+          <tr><td class="num">10</td><td class="type-pl">Partial Lunar</td><td class="type-pl">PL</td></tr>
+          <tr><td class="num">11</td><td class="type-pl">Partial Lunar</td><td class="type-pl">PL</td></tr>
+          <tr><td class="num">12</td><td class="type-tl">Total Lunar</td><td class="type-tl">TL</td></tr>
+          <tr><td class="num">13</td><td class="type-ps">Partial Solar</td><td class="type-ps">PS</td></tr>
+          <tr><td class="num">14</td><td class="type-tl">Total Lunar</td><td class="type-tl">TL</td></tr>
+          <tr><td class="num">…</td><td style="color:var(--textmuted);font-style:italic">continues to position 70…</td><td>…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col-r">
+      <div class="img-ph" style="min-height:160px">
+        <div class="ph-name">Pasted image 20240314095842.png</div>
+        <div class="ph-desc">Dimbleby's team sequence visual — All Past Time (1894)</div>
+      </div>
+      <div class="callout">"Same order. Every time. You can pick it up at position 44 and it's still the same type, same character. It never deviates."</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 23 — WHAT MAKES TOTAL vs PARTIAL
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s23">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">Why Is One Total and Another Partial? Here's the Mechanism.</div>
+  <div class="body-text">So this is getting complicated quickly, but let's take a moment and think about why the eclipse types vary within the team — and why that variation is <em>fixed</em>. What causes a solar eclipse to be total versus partial versus annular?</div>
+  <div class="body-text">A solar eclipse is <span class="hl-gold">TOTAL</span> when three things align: the Moon is at or near <span class="hl-blue">perigee</span> (closest to Earth — Moon appears larger), the Sun is near <span class="hl-blue">apogee</span> (apparently smaller), and the Moon is crossing a node dead-on. When all three of those align — total eclipse. The Moon's disk fully covers the Sun's disk. The corona appears.</div>
+  <div class="body-text">A solar eclipse is <span class="hl-red">ANNULAR</span> when the Moon is near apogee — too far away to fully cover the Sun. Ring of fire. And a <span class="hl-red">PARTIAL</span> when the alignment is off-centre at the node — the Moon's shadow grazes but doesn't fully cover. Each of these conditions cycles predictably through the Moon's orbital geometry over the Saros and anomalistic periods.</div>
+  <div class="two-col">
+    <div class="img-ph" style="min-height:170px">
+      <div class="ph-name">Pasted image 20240311065548.png</div>
+      <div class="ph-desc">Solar eclipse total condition — umbra/penumbra geometry</div>
+    </div>
+    <div class="img-ph" style="min-height:170px">
+      <div class="ph-name">Pasted image 20240311065613.png</div>
+      <div class="ph-desc">Moon apogee/perigee diagram — size variation effect on eclipse type</div>
+    </div>
+  </div>
+  <div class="callout">"Total = Moon at perigee, Sun at apogee, dead on the node. Every variable has to line up. The team sequence tells you when all those variables align in that configuration again."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 24 — TEAM NEVER LEAVES ITS YEAR MARKER
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s24">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">Each Team Has a Line of Time — It Never Leaves It</div>
+  <div class="body-text">This is one of Dimbleby's most important observations, and it's the thing that makes the chronometer actually work as a dating tool. So let me explain it carefully.</div>
+  <div class="body-text">Each year of the 18-year eclipse cycle is associated with a specific team position. That team has its own <span class="hl-gold">year marker</span> — its own position in the sequence. And Dimbleby showed that the teams never leave their year marker. They stay in their lane of time. A given eclipse type at a given position in the sequence always falls in the same position within the 18-year cycle, century after century after century.</div>
+  <div class="body-text">Why does this matter? Because if you find a historical eclipse record — say, from ancient Babylon, a record that says "a great solar eclipse occurred in such-and-such year of the reign of such-and-such king" — you can look at where that eclipse falls in the team sequence and in the 18-year cycle simultaneously. Those two coordinates together give you the calendar date with high precision. The team fixes the position in the larger cycle. The year marker fixes where you are within the team.</div>
+  <div class="body-text">This is what makes it a clock rather than just a pattern. A clock has a reading — a specific position you can recover from two independent observations. The team sequence gives you one coordinate. The year marker gives you the other.</div>
+  <div class="callout">"The teams never leave their year marker. Line of time. That's what makes this a usable clock — the position is fixed."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 25 — 18 YEARS × 70 ECLIPSES
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s25">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">The Arithmetic of the Team</div>
+  <div class="body-text">Let me do the simple arithmetic before we go further, because I want you to have these numbers solid in your head. Grade school math — that's all this is.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Calculation</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Eclipses per team</td><td class="num">70</td></tr>
+        <tr><td>Saros cycle duration</td><td class="num">18 years 10–11 days</td></tr>
+        <tr><td>Full team span</td><td class="num">~1,260–1,300 years</td></tr>
+        <tr><td>Teams per GAY revolution</td><td class="num">18</td></tr>
+        <tr><td>Total eclipses per revolution (18 × 70)</td><td class="num">1,260–1,261</td></tr>
+        <tr><td>Total eclipses in full GAY (2 revolutions)</td><td class="num">~2,520</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="body-text">18 times 70 is 1,260. Simple multiplication. That's the number of eclipses in one revolution of the Great Astronomical Year. Two revolutions gives you ~2,520 eclipses in the full 651-year GAY. These numbers are not arbitrary. 1,260 appears in biblical chronological texts as a significant period. When Dimbleby found it in the eclipse data, he didn't force it — it was already there.</div>
+  <div class="body-text">And 36 eclipse cycles × 18 years gives you the 651-year GAY. 36 steps. 360 degrees. One full circuit. We'll get to that. But for now — hold onto these numbers. 70. 18. 1,260. 36. 651. These are the numbers of the clock.</div>
+  <div class="callout">"18 times 70 is 1,260 eclipses per full cycle pairing. Simple multiplication. Grade school math."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 26 — HOW TEAM ROTATES AROUND THE REALM
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s26">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">The Team Rotates 360° in 18 Years — That Is Its Cycle</div>
+  <div class="body-text">So here's the spatial picture. We established that each Saros eclipse shifts ~120° west of the previous one because of the 8-hour offset. Three eclipses — three 120° shifts — equals 360°. One full rotation around the realm. That means it takes <span class="hl-gold">18 years</span> — counting three successive eclipses — for the team to complete one full 360° rotation around our flat realm.</div>
+  <div class="body-text">Let me say that again because it's the core of the whole thing. The team of eclipses rotates once around the realm in 18 years. That is its cycle. Right? One Saros = one rotation of the team around the realm. The eclipse occurs here. 6 years later, it occurs 120° west. 12 years later, 240° west. 18 years later — back to the same longitude, but in the next Saros, next team position. And so it marches.</div>
+  <div class="two-col">
+    <div class="img-ph" style="min-height:180px">
+      <div class="ph-name">Pasted image 20240311065433.png</div>
+      <div class="ph-desc">Eclipse pair path — step 1 of the 360° rotation sequence</div>
+    </div>
+    <div class="img-ph" style="min-height:180px">
+      <div class="ph-name">Pasted image 20240311065436.png</div>
+      <div class="ph-desc">Eclipse pair path — step 2 showing ~120° westward shift</div>
+    </div>
+  </div>
+  <div class="callout">"It takes 18 years for the teams of eclipses to make a 360 around our realm. That is its cycle. Right?"</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 27 — THE PATH SERIES
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s27">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">Here Is What That 120° Shift Looks Like in Practice</div>
+  <div class="body-text">And you can watch this. You can literally watch the eclipse move around the realm step by step using the real data. Let me walk you through it. Eclipse occurs here. 18 years later — over here, 120° west. 18 years after that — over here, another 120° west. Then here. Then here. Then here. All the way around. 36 steps gives you one half of the cycle — 325 years. Do it twice and you get the full 651-year Great Astronomical Year.</div>
+  <div class="three-col">
+    <div class="img-ph" style="min-height:160px">
+      <div class="ph-name">Pasted image 20240311065439.png</div>
+      <div class="ph-desc">Eclipse path — step 3</div>
+    </div>
+    <div class="img-ph" style="min-height:160px">
+      <div class="ph-name">Pasted image 20240311065442.png</div>
+      <div class="ph-desc">Eclipse path — step 4</div>
+    </div>
+    <div class="img-ph" style="min-height:160px">
+      <div class="ph-name">Pasted image 20240311065445.png</div>
+      <div class="ph-desc">Eclipse path — step 5</div>
+    </div>
+  </div>
+  <div class="callout">"You can actually watch the eclipse move around the realm step by step. Eclipse here. 18 years — here. 18 years — here. All the way around."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 28 — SAROS 9 AND 10 SIDE BY SIDE
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s28">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">Two Random Saros Series Lined Up — Same Character, Same Order</div>
+  <div class="body-text">Here's what Dimbleby did to test this. He picked two random Saros series — Saros 9 and Saros 10 — and lined them up. Not series he cherry-picked for a good result. Literally just two consecutive series. And here's what he found.</div>
+  <div class="body-text">The same sort of eclipse happens in the same order under the same Saros for the same conditions all the way through. Total solar, total solar — same characteristics, occurring in sequence. Partial lunar in position 3 — there it is in position 3 in both series. Total lunar in position 5 — there it is in both. You pick it up at position 44 — it's still the same type at position 44. It doesn't matter where you start looking. The character of each Saros cycle is indicative of this repeating cycle within it.</div>
+  <div class="body-text">This is not a coincidence in two series. He went back and checked many more. Every time. Every single series. Same eclipse character, same position, same order. The team structure is real, it's repeating, and it's everywhere in the data.</div>
+  <div class="img-ph">
+    <div class="ph-name">Pasted image 20240314095904.png</div>
+    <div class="ph-desc">Saros 9 and Saros 10 comparison from Dimbleby — showing identical eclipse character and sequence alignment</div>
+    <div class="ph-dim">Wide comparison format — two series laid side by side</div>
+  </div>
+  <div class="callout">"He picked two random Saroses. Lined them up. Same eclipse type, same order, same character. All the way through. It doesn't matter where you start looking."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 29 — TWO CONSECUTIVE TEAMS
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s29">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">Here Are Two Consecutive Teams of 70 — Identical in Nature</div>
+  <div class="body-text">And then Dimbleby went further. He didn't just compare individual Saros series. He took a full team of 70 for one consecutive sequence, then the team of 70 that follows immediately after, and compared them. Team 1 and Team 2. And they're exactly the same in nature.</div>
+  <div class="body-text">Team 1 spans from approximately 1500 to 1702 in his mapping. Team 2 follows immediately after. He marked them all the way through — every eclipse, every type, every position. The top view shows the full blown-up structure. The bottom view shows it from the other end. Same team. Same sequence. Same character. Two consecutive teams, identical.</div>
+  <div class="two-col">
+    <div class="img-ph" style="min-height:190px">
+      <div class="ph-name">Pasted image 20240314095910.png</div>
+      <div class="ph-desc">Team 1 and Team 2 — Dimbleby's full mapping showing consecutive team alignment</div>
+    </div>
+    <div class="img-ph" style="min-height:190px">
+      <div class="ph-name">Pasted image 20240314095925.png</div>
+      <div class="ph-desc">Teams mapped chronologically — the two teams laid out in sequence</div>
+    </div>
+  </div>
+  <div class="callout">"Team one. Team two. Identical in nature. He lined them up and they match. Same character, same order, same everything."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 30 — TEAMS MAPPED OUT IN FULL
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s30">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">Here Is the Full Chronological Map of the Teams</div>
+  <div class="body-text">Let me describe what Dimbleby's full mapping looks like. You have a team of 18 appearing graphed out — 18 different Saros series contributing to the team in rotation. On the outside, two random Saroses lined up. The same eclipse happening in the same order under the same Saros conditions all the way through. And the whole thing — all the chronologically dated positions — mapped out right there.</div>
+  <div class="body-text">The lunar cycles progress laterally across the calendar. You can read position in the team and position in the year simultaneously. That's the genius of it. This is the whole clock laid out. Once you understand the team, you can read position in time just from the character of an eclipse. You don't need an ephemeris. You don't need Newton. You need the character of the eclipse and a copy of Dimbleby's table.</div>
+  <div class="two-col">
+    <div class="img-ph" style="min-height:190px">
+      <div class="ph-name">Pasted image 20240314095958.png</div>
+      <div class="ph-desc">Full team chronological chart — complete mapping of eclipse teams across the GAY</div>
+    </div>
+    <div class="img-ph" style="min-height:190px">
+      <div class="ph-name">Pasted image 20240314100007.png</div>
+      <div class="ph-desc">Team detail view — zoomed section of Dimbleby's chronological eclipse map</div>
+    </div>
+  </div>
+  <div class="callout">"This is the whole clock laid out. Once you understand the team, you can read position in time just from the character of an eclipse."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 31 — 260 ECLIPSES IF THEY REPEAT
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s31">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">If You Take the Whole Cycle and Line It Up Every Time — 260 Eclipses</div>
+  <div class="body-text">Now here's an extension of the arithmetic that I want to be transparent about. In each character type — total solar, total lunar, partial solar, partial lunar — you get 260 eclipses if they were to repeat through the greater cycle. And if you were to take that whole cycle and just line it up every time — here's the 44th, same type, same type — total lunar, total, partial, all the way through — each Saros cycle is indicative of this repeating cycle within it.</div>
+  <div class="body-text">So the character and type of eclipses is repeated within this 70-eclipse cycle. And when you look at it at the character level — not just the individual team, but across the full 651-year GAY — the same eclipse character at any given position appears 260 times. That's the number of times each character type recurs across the complete master cycle.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Layer</th><th>Count</th><th>Period</th></tr></thead>
+      <tbody>
+        <tr><td>Single eclipse</td><td class="num">1</td><td>Occurs once</td></tr>
+        <tr><td>Returns per team (spacing)</td><td class="num">70</td><td>~18 years apart within team</td></tr>
+        <tr><td>Full team span</td><td class="num">~1,260 yrs</td><td>70 × 18 yr</td></tr>
+        <tr><td>Eclipse recurrences per character type</td><td class="num">260</td><td>Within the greater cycle</td></tr>
+        <tr><td>Total eclipses in full GAY</td><td class="num">~2,520</td><td>36 full cycles</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">"260 eclipses if they repeat within the character type. And the 44th has the same character as the 44th in every previous team. That's what the data shows."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 32 — THE TEAM IN THE HEAVENS
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s32">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">Here Is What the Team Looks Like From Above — a Circle</div>
+  <div class="body-text">Let me give you the full visualisation. You have one eclipse occur here in the sky — point A. The stars are rotating overhead. That same eclipse — same type, same character, one Saros cycle later — occurs over here, point B, 120° west. Then over here, point C. Then here. Then here. Then here. All the way around. 36 steps. That's 36 × 18 = 648 years for one revolution, with the ~3-year adjustment giving you 651.</div>
+  <div class="body-text">The same eclipse occurs every 18 years for a total of 36 times within 651 years. And that gives you the Great Astronomical Year. When you get <em>two</em> of these 36-step rotations — two full revolutions of the team around the realm — you get all ~2,520 eclipses of the complete GAY. The giant cycle. The master clock.</div>
+  <div class="two-col">
+    <div class="img-ph" style="min-height:190px">
+      <div class="ph-name">Pasted image 20240311065418.png</div>
+      <div class="ph-desc">Great cycle top-down circle diagram — the 36-step rotation visualised as a clock face</div>
+    </div>
+    <div class="img-ph" style="min-height:190px">
+      <div class="ph-name">Pasted image 20240311065427.png</div>
+      <div class="ph-desc">Team rotation / GAY overview — teams of eclipses completing the 360° rotation</div>
+    </div>
+  </div>
+  <div class="callout">"36 times around. 36 × 18 = 651 years. One Great Astronomical Year. All just the same team rotating around our realm."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 33 — SAROS-INEX PANORAMA PROVES IT
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s33">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">NASA's Own Grid — Look What It Shows</div>
+  <div class="body-text">Van den Bergh took all 8,000 solar eclipses in von Oppolzer's Canon and placed them in a two-dimensional matrix. Each Saros series is a column. Individual Saros columns staggered so horizontal rows correspond to different Inex series. One step down = one Saros period (6,585.32 days) later. One step right = one Inex period (10,571.95 days) later. Rows and columns numbered with Saros and Inex numbers.</div>
+  <div class="body-text">And here's what I love about this. NASA puts this on their website. They built this grid and they put it there. And for those who know where it comes from — for those who know the team structure, know the oscillation, know what the pattern means — it is magnificent. For everyone else, it means almost nothing. You look at it and it's a grid of numbers.</div>
+  <div class="body-text">But when you know the team structure, you can look at this grid and see the pattern everywhere. The oscillation is right there. The team structure is right there. The 651-year cycle is right there. In their own data. On their own website. They built the tool that proves the pattern and they didn't explain what the pattern means.</div>
+  <div class="two-col">
+    <div class="img-ph" style="min-height:180px">
+      <div class="ph-name">Pasted image 20240311070007.png</div>
+      <div class="ph-desc">Saros-Inex panorama — full view of the 8,000-eclipse matrix</div>
+    </div>
+    <div class="img-ph" style="min-height:180px">
+      <div class="ph-name">Pasted image 20240316050612.png</div>
+      <div class="ph-desc">Saros-Inex panorama annotated detail — showing oscillation and team pattern</div>
+    </div>
+  </div>
+  <div class="callout">"They built this grid and put it on their website. It shows the whole cycle structure laid out. The oscillation is right there. The pattern is right there. In their own data."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 34 — THE TEAM AS A CHRONOMETER
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s34">
+  <span class="part-badge">Part 4 — The Team of 70</span>
+  <div class="slide-title">You Can Use the Team to Date Any Historical Eclipse</div>
+  <div class="body-text">And this is where it becomes genuinely powerful as a tool. Let me walk you through exactly how Dimbleby's chronometer works in practice.</div>
+  <div class="body-text">You find a historical record. Let's say it's a Babylonian astronomical diary from around 600 BC that says: "A great eclipse occurred and the Sun was entirely hidden." That's a total solar eclipse. You know the character — <span class="type-ts" style="color:#ffcc44">TS</span> — Total Solar. Now, Total Solar appears at positions 1, 2, 4, 8, and several more positions in the 70-eclipse sequence. So you've narrowed it down.</div>
+  <div class="body-text">Cross-reference with what else the historical record says — was it winter? Summer? What king was reigning and in which year of his reign? The Hebrew calendar gives you a further constraint. The year marker in the team sequence gives you another. Two independent coordinates, precisely the way a GPS needs two signals to give you a position. Those two things together — character and calendar context — pin you to a specific team, a specific position, and therefore a specific year. That is the chronometer.</div>
+  <div class="img-ph">
+    <div class="ph-name">vlcsnap-00696.png</div>
+    <div class="ph-desc">Eclipse chronometer visualization — Dimbleby's method of dating historical eclipses from character and team position</div>
+  </div>
+  <div class="callout">"Character and type tell you where you are in the team. The Hebrew calendar tells you the year. Those two things together = the precise date. That's the chronometer."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 35 — THE TEAM SUMMARY
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s35">
+  <span class="part-badge">Part 4 — The Team of 70 — Summary</span>
+  <div class="slide-title">The Team of 70 — Everything You Need to Know on One Slide</div>
+  <div class="body-text">Before we move to the macro — the Great Astronomical Year — let me put the whole Team of 70 section on one slide. This is the centrepiece. This is Dimbleby's discovery. Hold onto all of this.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Eclipses per team</td><td class="num">70</td></tr>
+        <tr><td>Type sequence</td><td>Fixed — always repeating the same order</td></tr>
+        <tr><td>Types in sequence</td><td>TS, TS, PL, TS, TL, PS, PS, TS, TL, PL, PL, TL, PS, TL… (to 70)</td></tr>
+        <tr><td>Team span</td><td class="num">~1,260–1,300 years</td></tr>
+        <tr><td>Each eclipse spacing</td><td class="num">~18 years (one Saros)</td></tr>
+        <tr><td>Rotation per team</td><td class="num">360° around the realm</td></tr>
+        <tr><td>Teams per GAY revolution</td><td class="num">18</td></tr>
+        <tr><td>Eclipse recurrence per type</td><td class="num">~260 times in the greater cycle</td></tr>
+        <tr><td>Eclipses in full 651-yr GAY</td><td class="num">~2,520</td></tr>
+        <tr><td>Year-marker principle</td><td>Teams never leave their assigned year in the cycle</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="img-ph" style="min-height:140px">
+    <div class="ph-name">Pasted image 20240311065730.png</div>
+    <div class="ph-desc">Saros series repeating sister eclipses diagram — the team in visual form</div>
+  </div>
+  <div class="callout">"70 eclipses. Fixed sequence. Identical every time. This is the natural team. This is Dimbleby's discovery. This is the clock."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 36 — THE 651-YEAR GAY
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s36">
+  <span class="part-badge">Part 5 — The Great Astronomical Year</span>
+  <div class="slide-title">The Macro — 651 Years, the Full Clock</div>
+  <div class="stat-row">
+    <div class="stat"><span class="val">651</span><span class="lbl">Years — Full GAY</span></div>
+    <div class="stat"><span class="val">36</span><span class="lbl">Eclipse Cycles = 360°</span></div>
+    <div class="stat"><span class="val">2,520</span><span class="lbl">Total Eclipses</span></div>
+    <div class="stat"><span class="val">2</span><span class="lbl">Revolutions (A+B)</span></div>
+  </div>
+  <div class="body-text">Alright — we've done the micro. We've done the Saros. We've done the team of 70. Now let's go all the way up to the macro. The Great Astronomical Year. 651 years.</div>
+  <div class="body-text">The same eclipse occurs every 18 years for a total of 36 times within 651 years. 36 occurrences × 18 years = 648 years base, adjusted to 651 with the correction built into the two alternating revolutions. Each of those 36 steps is one Saros cycle moving the eclipse ~120° around the realm. 36 × ~10° per step effective = 360°. One full circuit. That's the definition of a year in this system — one full cycle of the eclipse team around the realm.</div>
+  <div class="body-text">The grand eclipse cycle of 651 years contains approximately 2,520 eclipses — all of them part of teams, all of them in fixed sequence, all of them predictable from the three foundational months and an 18-year ruler.</div>
+  <div class="img-ph">
+    <div class="ph-name">Pasted image 20240311065421.png</div>
+    <div class="ph-desc">GAY structure diagram — the full 651-year Great Astronomical Year laid out</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 37 — REVOLUTIONS A AND B
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s37">
+  <span class="part-badge">Part 5 — The Great Astronomical Year</span>
+  <div class="slide-title">325 Years, then 326 Years — Alternating, Keeping Time from Creation</div>
+  <div class="body-text">The Great Astronomical Year isn't a single undifferentiated 651-year block. It's divided into two alternating revolutions that keep the clock precise across millennia. Revolution (A) = 325 years = 18 eclipse cycles. Revolution (B) = 326 years = 18 eclipse cycles. They alternate. 325 + 326 = 651. 18 + 18 = 36 eclipse cycles = 360° of rotation.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Component</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Revolution (A)</td><td class="num">325 years / 18 eclipse cycles</td></tr>
+        <tr><td>Revolution (B)</td><td class="num">326 years / 18 eclipse cycles</td></tr>
+        <tr><td>Total GAY</td><td class="num">651 years / 36 eclipse cycles</td></tr>
+        <tr><td>Angular completion</td><td class="num">360°</td></tr>
+        <tr><td>Total eclipses</td><td class="num">~2,520</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="body-text">The one-year difference between A and B is the correction mechanism — analogous to a leap year. Without alternating between 325 and 326, the clock would drift. With it, it stays precise. Dimbleby traced this alternation back through all of recorded history and showed it remains consistent all the way back to the beginning of the biblical record. Keeping time from creation. That's not a metaphor — that's what the data shows.</div>
+  <div class="callout">"36 eclipse cycles. 360 degrees. 651 years. It resets. Then starts again. Keeping time from creation."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 38 — WHERE 2023 SITS
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s38">
+  <span class="part-badge">Part 5 — The Great Astronomical Year</span>
+  <div class="slide-title">Here's Where We Are Right Now in the Great Clock</div>
+  <div class="stat-row">
+    <div class="stat"><span class="val">162</span><span class="lbl">Year within current GAY</span></div>
+    <div class="stat"><span class="val">18</span><span class="lbl">Current team in the series</span></div>
+    <div class="stat"><span class="val">A÷2</span><span class="lbl">Halfway through Revolution A</span></div>
+  </div>
+  <div class="body-text">Let me ground this in the present moment, because this isn't just history — it's now. In 2023, we are at year <span class="hl-gold">162</span> of the current Great Astronomical Year. That's exactly half of Revolution A — 325 ÷ 2 = 162.5. We are precisely at the midpoint of the first revolution of the current GAY.</div>
+  <div class="body-text">This places 2023 at <span class="hl-gold">Team 18</span> in the repeating team series — the 18th team in Revolution A, which is the last team before the halfway point transitions into the second half. The clock is readable. It's been ticking since the beginning. We're at the halfway mark of the first of two revolutions. Nine eclipse cycles done in Revolution A. Nine to go before B begins.</div>
+  <div class="body-text">The clock is right there in the sky. It's been ticking the whole time. We just forgot how to read it — or were made to forget. Dimbleby remembered. And now we can read it too.</div>
+  <div class="callout">"Year 162. Team 18. Half of revolution A. We're exactly halfway. The clock is right there in the sky and it's been ticking the whole time."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 39 — THE ANTIKYTHERA MECHANISM
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s39">
+  <span class="part-badge">Part 5 — The Great Astronomical Year</span>
+  <div class="slide-title">They Built a Machine to Track It — 150 BC</div>
+  <div class="body-text">Here's the thing about this being "ancient knowledge." Someone built a mechanical device to track the Saros cycle. Around 150–100 BC in Greece. The Antikythera Mechanism. Recovered from a shipwreck off the Greek island of Antikythera in 1901 — been sitting in a museum ever since, and it took us over a century to figure out what it did.</div>
+  <div class="body-text">The Saros cycle of 223 synodic months is inscribed on it in Greek numerals — <span class="hl-gold">ΣΚΓ′</span> — and it is one of the only inscriptions visible to the naked eye on the device. They built a physical, mechanical, hand-held computer to track what was already observable in the sky. Not because the knowledge was secret. Because it was <em>standard</em>. This was normal ancient astronomical knowledge.</div>
+  <div class="body-text">And then we lost it. Or it was taken from us. Either way — it was in circulation in 150 BC. It was standard. It appeared in a common navigational device. And by the time the modern era arrived, people were being told you need Newton and a heliocentric model to predict eclipses. We went backwards.</div>
+  <div class="img-ph">
+    <div class="ph-name">Pasted image 20240310125034.png</div>
+    <div class="ph-desc">Antikythera Mechanism — the ancient mechanical eclipse predictor, ~150 BC Greece. Saros cycle (ΣΚΓ′ = 223) inscribed on the device.</div>
+  </div>
+  <div class="callout">"150 BC. They built a mechanical device to track the 223-month Saros cycle. This wasn't hidden. This was normal knowledge that we lost."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 40 — THE GAY AS THE ULTIMATE CLOCK
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s40">
+  <span class="part-badge">Part 5 — The Great Astronomical Year</span>
+  <div class="slide-title">The Great Astronomical Year Is the Master Clock</div>
+  <div class="body-text">Let me do the full micro-to-macro summary before we move into the shadow path section. Every level of the clock is built from the one below it. Every level is directly observable. None of it requires a telescope, a globe model, or a NASA contract.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Level</th><th>Duration</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><span class="hl-gold">Synodic Month</span></td><td class="num">29.53 days</td><td>Heartbeat — new moon to new moon</td></tr>
+        <tr><td><span class="hl-blue">Saros Cycle</span></td><td class="num">18 yrs 11 days 8 hrs</td><td>Team engine — all three months converge</td></tr>
+        <tr><td>Exeligmos</td><td class="num">54 yrs 33 days</td><td>Longitude reset — 3 × Saros</td></tr>
+        <tr><td><span class="hl-gold">Eclipse Team</span></td><td class="num">~1,260 yrs</td><td>70 eclipses in fixed sequence</td></tr>
+        <tr><td>Revolution (A)</td><td class="num">325 years</td><td>18 Saros cycles</td></tr>
+        <tr><td>Revolution (B)</td><td class="num">326 years</td><td>18 Saros cycles (correction)</td></tr>
+        <tr><td><span class="hl-red">Great Astronomical Year</span></td><td class="num">651 years</td><td>36 cycles / 360° — the master clock</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">"Micro to macro. Each level built from the one below it. The whole thing is observable without a telescope, a globe model, or NASA."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 41 — THE SHADOW PATH CLAIM
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s41">
+  <span class="part-badge">Part 6 — Shadow Prediction Without a Globe</span>
+  <div class="slide-title">Okay — Don't You Need the Globe for the Shadow Path?</div>
+  <div class="body-text">This is where the globe zealots pivot. When you demonstrate that eclipse occurrence prediction requires no heliocentric model — which I've now done — they shift to: "okay but you can't predict the <em>path of the shadow</em> without knowing the Earth is a globe." Right? That's the new claim. Let's go through what that actually means.</div>
+  <div class="body-text">Because I find this one very interesting. They're now admitting that eclipse timing prediction doesn't require a globe — they've quietly dropped that. Now the claim is specifically about the shadow path. Fair enough. Let's look at what the professional mathematical method for predicting shadow paths actually uses.</div>
+  <div class="body-text">And what we're going to find — and this isn't my opinion, this is just reading the actual Besselian method documentation — is that the shadow path prediction uses a <span class="hl-gold">flat plane</span>. An X-Y coordinate system. Not a sphere. A plane. The fundamental plane. And the position of the shadow is described by polynomial expressions in X and Y. No globe geometry required.</div>
+  <div class="callout">"You can't possibly predict the shadow path without knowing the Earth is a globe — that's what they all chant. They heard someone say it. Let's actually look at what shadow path prediction uses."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 42 — BESSELIAN ELEMENTS — THE FLAT PLANE
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s42">
+  <span class="part-badge">Part 6 — Shadow Prediction Without a Globe</span>
+  <div class="slide-title">The Shadow Moves Across a Flat Plane. That's the Model.</div>
+  <div class="two-col-img">
+    <div>
+      <div class="body-text">Besselian elements. A series of polynomial expressions — published for every solar eclipse by every major eclipse prediction system in the world, including NASA's. They describe the movement of the Moon's shadow across the <span class="hl-gold">fundamental plane</span>.</div>
+      <div class="body-text">Here's the definition of the fundamental plane — I'm reading from the actual methodology documentation: "A plane is passed through the center of the Earth, perpendicular to the axis of the Moon's shadow." That's the plane. Perpendicular to the shadow axis. An X-Y coordinate system with its origin at the geocenter. X points east toward the celestial equator. Y points north toward the celestial pole.</div>
+      <div class="body-text">That's what it's expressing. The movement of the Moon's shadow across our flat plane. An X-Y Cartesian coordinate system. Not spherical coordinates. Not globe coordinates. A flat plane with X and Y. And that is the mathematical model used by professional astronomers, by NASA, by Fred Espenak, by every eclipse calculation system — to predict where the shadow goes.</div>
+      <div class="callout">"A plane. Not a sphere. A plane with X and Y coordinates. That is the mathematical model used to predict shadow paths."</div>
+    </div>
+    <div class="img-ph">
+      <div class="ph-name">Pasted image 20240319023622.png</div>
+      <div class="ph-desc">Besselian elements table — the eight parameters used in professional shadow path prediction</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 43 — X AND Y ARE ALL YOU NEED
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s43">
+  <span class="part-badge">Part 6 — Shadow Prediction Without a Globe</span>
+  <div class="slide-title">Adjusting X and Y Is All You Need to Predict the Path</div>
+  <div class="two-col-img">
+    <div>
+      <div class="body-text">Let me walk you through it step by step. X is the <span class="hl-blue">horizontal</span> position of the shadow axis on the fundamental plane. Moving right = positive X. Moving left = negative X. Y is the <span class="hl-blue">vertical</span> position. Moving up = positive Y. Moving down = negative Y. That's your coordinate system.</div>
+      <div class="body-text">The polynomial in T — time — describes how X and Y each change over time. The first-order term gives you the rate of change. The second-order term gives you the curvature, how the motion is accelerating or decelerating. So you have:</div>
+      <div style="background:var(--cardBg);border:1px solid var(--gold);border-radius:6px;padding:14px;margin:12px 0;font-family:monospace;font-size:clamp(12px,1.3vw,15px);color:var(--gold)">
+        X(t) = X₀ + X₁·t + X₂·t²<br>
+        Y(t) = Y₀ + Y₁·t + Y₂·t²
+      </div>
+      <div class="body-text">Plot those two curves over time. That's the shadow path. Project those X and Y values onto any map. You've predicted the shadow path. "Super easy to understand, super easy to predict." That's from the analysis — not my words. The actual methodology documentation says: super easy to understand.</div>
+      <div class="callout">"X and Y. Polynomial in time. Plot it in a spreadsheet. That's the shadow path. No heliocentrism. No globe."</div>
+    </div>
+    <div class="img-ph">
+      <div class="ph-name">Pasted image 20240320080107.png</div>
+      <div class="ph-desc">Shadow path polynomial plot — X and Y coordinates plotted over time showing the eclipse track</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 44 — THE EIGHT ELEMENTS
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s44">
+  <span class="part-badge">Part 6 — Shadow Prediction Without a Globe</span>
+  <div class="slide-title">Eight Parameters. All Observable. None Require a Globe.</div>
+  <div class="body-text">Here are the eight Besselian elements. Every one of them. I want you to look at this list and identify which one requires you to assume the Earth is a ball.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Element</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td class="num" style="color:var(--gold)">x, y</td><td>Shadow axis position in the Fundamental Plane (the flat X-Y surface)</td></tr>
+        <tr><td class="num" style="color:var(--gold)">L1</td><td>Penumbral shadow radius — observationally derived</td></tr>
+        <tr><td class="num" style="color:var(--gold)">L2</td><td>Umbral shadow radius — observationally derived</td></tr>
+        <tr><td class="num" style="color:var(--blue)">d</td><td>Declination of Moon's shadow axis (celestial measurement)</td></tr>
+        <tr><td class="num" style="color:var(--blue)">µ</td><td>Hour angle of Moon's shadow axis (time-based measurement)</td></tr>
+        <tr><td class="num" style="color:var(--textmuted)">f1</td><td>Penumbral cone angle — geometrically derived from observation</td></tr>
+        <tr><td class="num" style="color:var(--textmuted)">f2</td><td>Umbral cone angle — geometrically derived from observation</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="body-text">Position. Shadow size. Declination angle. Hour angle. Cone angles. Not one of these requires you to assume the Earth is a sphere. They're all geometric or observational measurements. The flat plane of the fundamental plane is built in — X and Y, not latitude and longitude, not spherical polar coordinates. Not one item on this list requires a globe assumption.</div>
+  <div class="callout">"Eight parameters. Geometrical. Observational. Not one of them requires you to assume the Earth is a ball."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 45 — SHADOW SIZE IS OBSERVATIONAL
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s45">
+  <span class="part-badge">Part 6 — Shadow Prediction Without a Globe</span>
+  <div class="slide-title">They Measured the Shadow Size. They Didn't Calculate It from a Globe.</div>
+  <div class="body-text">The shadow radii — L1 and L2 — are worth a closer look. Because this is where you'd expect the globe model to sneak in, right? If you're computing shadow sizes, don't you need to know the sizes of the Earth, Moon, and Sun from a heliocentric model? Let's see what actually happened historically.</div>
+  <div class="body-text"><span class="hl-gold">La Hire (1707)</span> — noticed that the Earth's shadow, when he compared predicted lunar eclipse timings to observed timings, was larger than geometry said it should be. So he added an enlargement factor of 1/41 to match observations. Not from theory — from observation. He looked at the data, found a discrepancy, and adjusted empirically.</div>
+  <div class="body-text"><span class="hl-gold">Lambert</span> said the factor should be 1/40. <span class="hl-gold">Mayer</span> said 1/60. <span class="hl-gold">Beer and Maedler (1833)</span> found 1/50 from direct observations and that became the standard. The 1/50 factor used today in professional eclipse calculations is entirely empirical. It was measured from observations. Not derived from globe geometry. Not calculated from planetary radii.</div>
+  <div class="body-text">And <span class="hl-gold">Fred Espenak himself</span> — NASA's foremost eclipse calculator — noted in his own published documentation that heliocentric center-of-mass corrections have <span class="hl-red">"no practical impact on the present work."</span> His words. Not mine.</div>
+  <div class="callout">"They measured it from observations and adjusted it to fit reality. No globe model required for that. Even Fred said so."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 46 — NO HELIOCENTRISM REQUIRED
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s46">
+  <span class="part-badge">Part 6 — Shadow Prediction Without a Globe</span>
+  <div class="slide-title">The Official Conclusion — From the Besselian Method Itself</div>
+  <div class="body-text">Let me walk through the complete process one more time. Start with the polynomial. You have X(t) and Y(t) — the shadow's position on the flat fundamental plane at any moment in time. Graph those functions. You get a curve. That curve is the path of the shadow across the flat plane.</div>
+  <div class="body-text">Now project that path onto a map. You're converting flat-plane coordinates to the map's coordinate system. And here's the thing — this works on <span class="hl-gold">any equidistant map projection</span>. Any cylindrical projection. Any flat map. Including the Azimuthal Equidistant map — the flat Earth map. The coordinates don't care what projection you use. You're just converting X-Y to the map grid.</div>
+  <div class="body-text">And that gives you the whole process from beginning to end — predicted path of a solar eclipse. "No heliocentrism or globularity required." Those are the exact words from the analysis of the actual Besselian method. Not my words. From the analysis. Those are the words of someone who went through the Besselian documentation step by step and concluded: at no step does this require a globe assumption.</div>
+  <div class="callout">"No heliocentrism or globularity required. Those are the exact words. Not mine. From the analysis of the actual Besselian method."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 47 — THE LUNAR CALENDAR
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s47">
+  <span class="part-badge">Part 7 — Calendars & Closing</span>
+  <div class="slide-title">The Original Calendar of the Sky — More Astronomical Than What We Use</div>
+  <div class="stat-row">
+    <div class="stat"><span class="val">354</span><span class="lbl">Days per Lunar Year</span></div>
+    <div class="stat"><span class="val">12</span><span class="lbl">Lunations per Year</span></div>
+    <div class="stat"><span class="val">29/30</span><span class="lbl">Alternating Month Lengths</span></div>
+  </div>
+  <div class="body-text">The lunar year is 354 days. 12 lunations of alternating 29 and 30 days — so the average is 29.5, matching the synodic month. Every month begins with a new moon. Every month ends just before the next new moon. The structure is inherently astronomical — it's built directly on the observation of the Moon's phases.</div>
+  <div class="body-text">Jews, Turks, and Chinese historically used this. The Islamic calendar still does — pure lunar, no correction for seasons, which is why Ramadan migrates through all seasons over a 33-year cycle. The Hebrew calendar was originally lunar and evolved into a lunisolar system to stay anchored to the seasons for agricultural purposes.</div>
+  <div class="body-text">Our Gregorian calendar, by comparison, begins and ends anywhere. A month can start on any Moon phase. February has 28 days for no astronomical reason. It is a purely solar calendar with pagan Roman structure dressed up with medieval saints. It disconnects us from the Moon entirely — and the Moon is the primary timekeeper of the sky clock system we've been discussing.</div>
+  <div class="callout">"12 lunations. 354 days. Every month begins with a new moon. This is the original calendar of the sky."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 48 — LUNISOLAR INTERCALATION
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s48">
+  <span class="part-badge">Part 7 — Calendars & Closing</span>
+  <div class="slide-title">Leap Months, Not Leap Days — the Hebrew Solution</div>
+  <div class="body-text">So how do you keep a lunar calendar aligned with the seasons? You add whole extra months — leap months — not leap days. The Hebrew calendar does this. It's built on the Metonic cycle — that 19-year sub-harmonic we talked about earlier. 235 synodic months ≈ 19 solar years. In every 19-year Metonic cycle, 7 extra months are inserted, in years 3, 6, 8, 11, 14, 17, and 19. That keeps the lunar and solar systems in sync.</div>
+  <div class="body-text">But here's the beautiful part — and this is completely lost in our modern calendar. In the ancient system, you didn't just mechanically add a leap month in year 3. You waited for <em>the sky to tell you</em>. If the winter wheat wasn't ready at the appointed time — if the barley harvest wasn't ripe for the Passover offering — the year didn't start yet. You waited for the next full moon after the harvest was ready. That's the leap month. Crazy when you think about it, right?</div>
+  <div class="body-text">The sky tells you when the year starts. Not the calendar on your wall. Not the pope's decree about what day it is. The wheat has to be ready. Then the next new moon is your new year. The calendar serves the sky, not the other way around. We've completely inverted this relationship in our modern system.</div>
+  <div class="callout">"The sky tells you when the year starts. Not the calendar on your wall. The wheat has to be ready. Then the next new moon is your new year."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 49 — COMPLETE PREDICTION TOOLKIT
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s49">
+  <span class="part-badge">Part 7 — Calendars & Closing</span>
+  <div class="slide-title">Everything You Need. All Observational. No Globe Required.</div>
+  <div class="body-text">This is the complete toolkit. Every item on this list is observational. Not one of them requires a heliocentric globe model. I want you to look at this list and tell me where the globe sneaks in — because it doesn't.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Tool</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="hl-gold">Three lunar month durations</span></td><td>Build the Saros — the foundational unit</td></tr>
+        <tr><td><span class="hl-gold">Saros duration (18 yrs 11 days 8 hrs)</span></td><td>Base repeating unit — eclipse prediction engine</td></tr>
+        <tr><td>Exeligmos (54 yrs 33 days)</td><td>Correct longitude drift — same spot in 3 cycles</td></tr>
+        <tr><td><span class="hl-gold">Team of 70 eclipse sequence</span></td><td>Know which eclipse you're in — the fixed sequence</td></tr>
+        <tr><td>Eclipse type and character</td><td>Position in team → calendar date (Dimbleby's method)</td></tr>
+        <tr><td><span class="hl-blue">Besselian X, Y polynomial</span></td><td>Plot shadow path on flat fundamental plane</td></tr>
+        <tr><td>Graticule map (any projection)</td><td>Project flat-plane shadow onto real geography</td></tr>
+        <tr><td>Observation records / spreadsheet</td><td>Validate and extrapolate — 12,000 observations minimum</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">"That's the whole toolkit. Every item is observational. None of it requires a heliocentric globe model."</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SLIDE 50 — CONCLUSION
+══════════════════════════════════════════════════ -->
+<div class="slide" id="s50">
+  <div class="big-close">No Heliocentrism.<br>No Globularity.<br>Required.</div>
+  <div style="width:300px;height:1px;background:var(--red);margin:0 auto 24px;opacity:.5"></div>
+  <div class="body-text" style="max-width:800px;text-align:center;margin:0 auto">This knowledge was forgotten and occulted, then weaponized against us. But it was always there in the sky. A stick in the yard. Grade school math. 18 eclipse cycles. 70 in a team. The Great Astronomical Year ticking since creation.</div>
+  <div class="body-text" style="max-width:800px;text-align:center;margin:12px auto">Dimbleby proved it in 1894. Patricia showed me the book. I went and read it. And when you do it — it holds up. Every time. The sky is a clock. All you have to do is look up.</div>
+  <div class="img-ph" style="max-width:600px;margin:16px auto;min-height:150px">
+    <div class="ph-name">Pasted image 20240311065730.png</div>
+    <div class="ph-desc">Repeating cycle diagram — the final visual</div>
+  </div>
+  <div class="callout" style="max-width:700px;margin:0 auto;text-align:left">"The sky is a clock. Learn to read it. No NASA required."</div>
+</div>
+
+</div><!-- end slideWrap -->
+
+<!-- ═══════════════════════════════════════════════
+     BOTTOM NAV BAR
+══════════════════════════════════════════════════ -->
+<div id="bar">
+  <button id="prevBtn">&#8592; Prev</button>
+  <div id="dots"></div>
+  <button id="srcBtn" onclick="document.getElementById('sources').style.display='block'">Sources</button>
+  <button id="nextBtn">Next &#8594;</button>
+  <div id="counter">1 / 50</div>
+</div>
+</div><!-- end app -->
+
+<!-- ═══════════════════════════════════════════════
+     SOURCES PANEL
+══════════════════════════════════════════════════ -->
+<div id="sources">
+  <button id="closeSrc" onclick="document.getElementById('sources').style.display='none'">&#x2715; Close</button>
+  <h2>Sources & References</h2>
+  <ul>
+    <li>Dimbleby, J. B. (1894). <em>All Past Time</em>. [PDF available in description]</li>
+    <li>Espenak, F. (2009). <em>Five Millennium Catalog of Solar Eclipses</em>. NASA Goddard Space Flight Center. <a href="https://eclipse.gsfc.nasa.gov">eclipse.gsfc.nasa.gov</a></li>
+    <li>Espenak, F. (2009). <em>Five Millennium Catalog of Lunar Eclipses</em>. NASA Goddard Space Flight Center.</li>
+    <li>Trowbridge, D. (1874). "The Recurrence of Eclipses." <em>The Analyst</em>, 1(1), 3–5.</li>
+    <li>Rehak, A. (2002). <em>Regression of Lunar Nodes</em>.</li>
+    <li>Fendt, W. (2002). <em>Basics of Positional Astronomy and Ephemerides</em>.</li>
+    <li>NASA Besselian Elements: <a href="https://eclipse.gsfc.nasa.gov/SEcat5/beselm.html">eclipse.gsfc.nasa.gov/SEcat5/beselm.html</a></li>
+    <li>Eclipsewise.com — Fred Espenak's eclipse catalogue</li>
+    <li>Globebusters S13E16 — <em>The Great Turtle Clock in the Sky</em></li>
+    <li>Eclipse Cycle Team Pattern Visualizations — AntiDisinfo86 (Twitter)</li>
+    <li>Shane's Eclipse Notes — aethercosmology.com</li>
+    <li>Patricia — Globebusters Discord — first introduction to Dimbleby's <em>All Past Time</em></li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════ -->
+<script>
+(function(){
+  const TOTAL = 50;
+  let cur = 0;
+
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const dotsEl = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+
+  // Build dots
+  for(let i = 0; i < TOTAL; i++){
+    const d = document.createElement('div');
+    d.className = 'dot' + (i===0?' active':'');
+    d.title = 'Slide ' + (i+1);
+    d.addEventListener('click', ()=>goTo(i));
+    dotsEl.appendChild(d);
+  }
+
+  function goTo(n){
+    if(n < 0) n = 0;
+    if(n >= TOTAL) n = TOTAL-1;
+    slides[cur].classList.remove('active');
+    dotsEl.children[cur].classList.remove('active');
+    cur = n;
+    slides[cur].classList.add('active');
+    dotsEl.children[cur].classList.add('active');
+    counter.textContent = (cur+1) + ' / ' + TOTAL;
+    slides[cur].scrollTop = 0;
+    prevBtn.disabled = cur === 0;
+    nextBtn.disabled = cur === TOTAL-1;
+  }
+
+  prevBtn.addEventListener('click', ()=>goTo(cur-1));
+  nextBtn.addEventListener('click', ()=>goTo(cur+1));
+
+  // Keyboard navigation
+  document.addEventListener('keydown', e=>{
+    if(document.getElementById('sources').style.display==='block') return;
+    if(e.key==='ArrowRight'||e.key==='ArrowDown') goTo(cur+1);
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp') goTo(cur-1);
+    if(e.key==='Home') goTo(0);
+    if(e.key==='End') goTo(TOTAL-1);
+  });
+
+  // Touch swipe
+  let touchX = null;
+  document.addEventListener('touchstart', e=>{ touchX = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend', e=>{
+    if(touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if(Math.abs(dx) > 50){ dx < 0 ? goTo(cur+1) : goTo(cur-1); }
+    touchX = null;
+  }, {passive:true});
+
+  // Initial state
+  goTo(0);
+})();
+</script>
+</body>
+</html>
